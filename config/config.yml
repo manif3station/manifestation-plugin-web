@@ -1,0 +1,10 @@
+appname: "Web"
+layout: "main"
+charset: "UTF-8"
+views: /web/views
+template: "template_toolkit"
+engines:
+  template:
+    template_toolkit:
+      start_tag: '[%'
+      end_tag:   '%]'
