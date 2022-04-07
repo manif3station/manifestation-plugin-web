@@ -79,19 +79,21 @@ has global_triggers => (
         my $triggers = {
             traces => sub {
                 my ( $self, $traces ) = @_;
+
                 # Carp is already a dependency
                 $Carp::Verbose = $traces ? 1 : 0;
             },
         };
 
-        my $runner_config = defined $Dancer2::runner
-                            ? Dancer2->runner->config
-                            : {};
+        my $runner_config =
+          defined $Dancer2::runner
+          ? Dancer2->runner->config
+          : {};
 
         for my $global ( keys %$runner_config ) {
             next if exists $triggers->{$global};
             $triggers->{$global} = sub {
-                my ($self, $value) = @_;
+                my ( $self, $value ) = @_;
                 Dancer2->runner->config->{$global} = $value;
             }
         }
@@ -104,23 +106,29 @@ sub _build_default_config { +{} }
 
 sub _build_environment { 'development' }
 
+use MF::Utils qw(listdir file);
+
 sub _build_config_files {
-    my @files = (
-        "$ENV{MF_CONFIG_DIR}/Web/config.yml",
-        "$ENV{MF_CONFIG_DIR}/Web/$ENV{DANCER_ENVIRONMENT}.yml",
-    );
+    my @files =
+      grep { $_ } map { file CONFIG => Web => "$_.yml", want => 'path' }
+      ( 'config', $ENV{DANCER_ENVIRONMENT} );
 
-    opendir( my $CONFIG, $ENV{MF_CONFIG_DIR} );
+    listdir $ENV{MF_CONFIG_DIR} => sub {
+        my %row = @_;
 
-    while ( my $plugin = readdir($CONFIG) ) {
-        next if $plugin eq '.' || $plugin eq '..' || $plugin eq 'Web';
+        my $plugin = $row{plugin};
 
-        my $config_file = "$ENV{MF_CONFIG_DIR}/$plugin/config.yml";
+        return if $plugin eq 'Web';
 
-        push @files, $config_file if -f $config_file;
-    }
+        my $config_file = file CONFIG => $plugin => 'config.yml',
+          want => 'path'
+          or return;
 
-    closedir($CONFIG);
+        push @files, $config_file;
+    } => {
+        dir_only => 1,
+        alias    => 'plugin',
+    };
 
     return \@files;
 }
@@ -134,8 +142,9 @@ sub _build_config {
     my $config = Hash::Merge::Simple->merge(
         $default,
         map {
-            warn "Merging config file $_\n" if $ENV{DANCER_CONFIG_VERBOSE};
-            $self->load_config_file($_) 
+            warn "Merging config file $_\n"
+              if $ENV{DANCER_CONFIG_VERBOSE};
+            $self->load_config_file($_)
         } @{ $self->config_files }
     );
 
@@ -175,8 +184,7 @@ sub _compile_config {
 
     foreach my $key ( keys %{$config} ) {
         my $value = $config->{$key};
-        $config->{$key} =
-          $self->_compile_config_entry( $key, $value, $config );
+        $config->{$key} = $self->_compile_config_entry( $key, $value, $config );
     }
     return $config;
 }
@@ -225,7 +233,7 @@ my $_normalizers = {
         require_module('Encode');
         my $encoding = Encode::find_encoding($charset);
         croak
-          "Charset defined in configuration is wrong : couldn't identify '$charset'"
+"Charset defined in configuration is wrong : couldn't identify '$charset'"
           unless defined $encoding;
         my $name = $encoding->name;
 
@@ -246,9 +254,10 @@ sub _normalize_config_entry {
 sub _compile_config_entry {
     my ( $self, $name, $value, $config ) = @_;
 
-    my $trigger = exists $self->local_triggers->{$name} ?
-                         $self->local_triggers->{$name} :
-                         $self->global_triggers->{$name};
+    my $trigger =
+      exists $self->local_triggers->{$name}
+      ? $self->local_triggers->{$name}
+      : $self->global_triggers->{$name};
 
     defined $trigger or return $value;
 

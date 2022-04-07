@@ -3,21 +3,24 @@
 use strict;
 use warnings;
 
-my $psgi    = "$ENV{MF_BIN_DIR}/Web/web.psgi";
-my $lib     = "$ENV{MF_LIB_DIR}/Web";
+use MF::Utils qw( defor deforset );
 
-my $port    = $ENV{CORE_WEB_PORT} // 8080;
-my $workers = $ENV{CORE_WEB_WORKERS} // 10;
-my $env     = $ENV{DANCER_ENVIRONMENT} // '';
+my $psgi = "$ENV{MF_BIN_DIR}/Web/web.psgi";
+my $lib  = "$ENV{MF_LIB_DIR}/Web";
 
-if ($env eq 'development') {
-    if ($ENV{DEBUG}) {
-        exec qq(carton exec perl -I $lib -d $ENV{PERL_CARTON_PATH}/bin/plackup --port $port $psgi);
-    }
-    else {
-        exec qq(carton exec plackup -I $lib -s Starman --max-requests=100 --preload-app --workers=$workers --listen=:$port $psgi);
-    }
+my $port    = deforset $ENV{CORE_WEB_PORT},      8080;
+my $workers = deforset $ENV{CORE_WEB_WORKERS},   10;
+my $env     = deforset $ENV{DANCER_ENVIRONMENT}, 'development';
+
+if ( $env eq 'production' ) {
+    exec
+qq(carton exec starman -I $lib --max-requests=100 --preload-app --port $port --workers=$workers $psgi);
+}
+elsif ( $ENV{DEBUG} ) {
+    exec
+qq(carton exec perl -I $lib -d $ENV{PERL_CARTON_PATH}/bin/plackup --port $port $psgi);
 }
 else {
-    exec qq(carton exec starman -I $lib --max-requests=100 --preload-app --port $port --workers=$workers $psgi);
+    exec
+qq(carton exec plackup -I $lib -s Starman --max-requests=100 --preload-app --workers=$workers --listen=:$port $psgi);
 }
